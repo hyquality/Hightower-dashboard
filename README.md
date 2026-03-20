@@ -44,7 +44,8 @@ npm run dev
    | `BREVO_API_KEY` | Server |
    | `BREVO_SENDER_EMAIL` | Server |
    | `BREVO_SENDER_NAME` | Server (optional) |
-   | `BRAND_LOGO_URL` | Server (optional, for outbound HTML emails) |
+   | `PUBLIC_APP_URL` | Server — `https://your-domain` (no trailing slash); builds logo URL for outbound email `<img>` (`/public/hightower-logo-email.png`) |
+   | `BRAND_LOGO_URL` | Server (optional) — full logo URL; overrides `PUBLIC_APP_URL` + path |
    | `BREVO_WEBHOOK_SECRET` | Server (recommended) |
 
 4. Redeploy after saving env vars.

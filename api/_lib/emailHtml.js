@@ -1,8 +1,18 @@
-const DEFAULT_LOGO =
-  "https://media.base44.com/images/public/69b96bd6284e25468bc782a4/7eb1822cd_hightower-logo.png";
+import { resolveOutboundEmailLogoUrl } from "./resolveEmailLogoUrl.js";
 
 export function buildEmailHtml({ subject = "", body = "", recipientName = "" } = {}) {
-  const logoUrl = process.env.BRAND_LOGO_URL || DEFAULT_LOGO;
+  const resolvedLogo = resolveOutboundEmailLogoUrl();
+  const logoUrl = resolvedLogo;
+  if (!resolvedLogo) {
+    console.warn(
+      "emailHtml: set PUBLIC_APP_URL (e.g. https://your-app.vercel.app) or BRAND_LOGO_URL so the logo <img> has an absolute URL."
+    );
+  }
+  const logoHtml = logoUrl
+    ? `<img src="${String(logoUrl).replace(/&/g, "&amp;").replace(/"/g, "&quot;")}" alt="Hightower Funding" width="280"
+         style="display:block;margin:0 auto;max-width:280px;width:100%;height:auto;background:#ffffff;border-radius:8px;padding:12px 18px;box-sizing:content-box;" />`
+    : `<span style="display:inline-block;font-size:20px;font-weight:800;color:#ffffff;letter-spacing:0.06em;">HIGHTOWER FUNDING</span>`;
+
   const greeting = recipientName ? `Hi ${recipientName},` : "Hello,";
   const bodyHtml = body
     .split("\n")
@@ -27,8 +37,7 @@ export function buildEmailHtml({ subject = "", body = "", recipientName = "" } =
         <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
           <tr>
             <td style="padding:0 0 24px 0;text-align:center;">
-              <img src="${logoUrl}" alt="Hightower Funding" width="220"
-                   style="display:block;margin:0 auto;max-width:220px;background:#ffffff;border-radius:8px;padding:10px 16px;" />
+              ${logoHtml}
             </td>
           </tr>
           <tr>

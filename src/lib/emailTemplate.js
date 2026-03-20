@@ -28,13 +28,13 @@ export function buildEmailHtml({ subject = "", body = "", recipientName = "" } =
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
-          <!-- LOGO HEADER -->
+          <!-- LOGO HEADER (hosted image — helps email clients load images; Brevo open pixel is separate) -->
           <tr>
             <td style="padding:0 0 24px 0;text-align:center;">
               <img src="${BRAND_LOGO_URL}"
                    alt="Hightower Funding"
-                   width="220"
-                   style="display:block;margin:0 auto;max-width:220px;background:#ffffff;border-radius:8px;padding:10px 16px;" />
+                   width="280"
+                   style="display:block;margin:0 auto;max-width:280px;width:100%;height:auto;background:#ffffff;border-radius:8px;padding:12px 18px;box-sizing:content-box;" />
             </td>
           </tr>
 

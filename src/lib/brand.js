@@ -1,4 +1,17 @@
-/** Public brand assets — override with VITE_BRAND_LOGO_URL (e.g. Supabase Storage public URL). */
+/** Served from /public — same file is used in outbound HTML emails (absolute URL on deploy). */
+export const BRAND_LOGO_PUBLIC_PATH = "/hightower-logo-email.png";
+
+function browserOrigin() {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+  return "";
+}
+
+/**
+ * Navbar + in-app email preview.
+ * Override with VITE_BRAND_LOGO_URL for a CDN; otherwise same host as the app + public logo.
+ */
 export const BRAND_LOGO_URL =
   import.meta.env.VITE_BRAND_LOGO_URL ||
-  "https://media.base44.com/images/public/69b96bd6284e25468bc782a4/7eb1822cd_hightower-logo.png";
+  (browserOrigin() ? `${browserOrigin()}${BRAND_LOGO_PUBLIC_PATH}` : BRAND_LOGO_PUBLIC_PATH);
