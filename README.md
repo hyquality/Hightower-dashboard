@@ -63,11 +63,20 @@ npm run dev
 
    The webhook treats a **click** as proof the message was engaged with and also sets **Opened** when Brevo never sends a separate open event (common with image blocking / link-only interaction).
 
-3. **Webhook auth:** set `BREVO_WEBHOOK_SECRET` in Vercel. Configure Brevo to send the same value as either:
-   - header `x-webhook-secret`, or  
-   - `Authorization: Bearer <secret>`  
+3. **Webhook auth:** set `BREVO_WEBHOOK_SECRET` in Vercel. Configure Brevo to send the same value as either header `x-webhook-secret` or `Authorization: Bearer <secret>` (UI varies by webhook type).
 
-   (Brevo’s UI varies; use whichever custom header / secret option they provide for your webhook type.)
+### If “Opened” stays empty in the dashboard
+
+1. **Your header logo is unrelated** — Brevo open tracking uses a **separate invisible pixel** added when `trackOpens: true` is sent. Loading the logo does not replace that pixel.
+
+2. **Many inboxes never load images** — Apple Mail “Protect Mail Activity”, Gmail, etc. often block or proxy images. You may get **clicks** (tracked links) but **no** open webhook. After deploy, a **click** webhook should still set **Opened** in this app (infer engagement).
+
+3. **Confirm in Brevo** — In Brevo’s transactional logs for the same message, do **they** show an open? If Brevo shows no open, the problem is client/settings, not the dashboard. If Brevo shows opens but Supabase does not, check webhook URL and that **opened / unique_opened / proxy_open / unique_proxy_open** are subscribed.
+
+4. **Match `message_id`** — Rows must have `email_logs.message_id` equal to Brevo’s `message-id` in the webhook. Imported logs or old sends often **don’t** match; the webhook then falls back to **email + subject** (now compared with normalized spacing/case).
+
+5. **Backfill older rows** (one-time):  
+   `update public.email_logs set opened = true where clicked = true and opened is distinct from true;`
 
 ## API routes (Vercel)
 

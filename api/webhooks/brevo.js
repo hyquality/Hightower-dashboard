@@ -60,7 +60,15 @@ function extractEvent(payload) {
 
 function extractEmail(payload) {
   for (const root of walkPayloadRoots(payload)) {
-    const e = root.email ?? root.Email;
+    const e =
+      root.email ??
+      root.Email ??
+      root.recipient ??
+      root.to ??
+      root.to_email;
+    if (e != null && typeof e === "object" && e.email) {
+      e = e.email;
+    }
     if (e != null && String(e).trim() !== "") {
       return String(e).trim().toLowerCase();
     }
@@ -76,6 +84,14 @@ function extractSubject(payload) {
     }
   }
   return "";
+}
+
+/** Match DB subject to Brevo webhook subject despite spacing / case differences. */
+function normalizeSubject(s) {
+  return String(s || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 }
 
 function isOpenEvent(event) {
@@ -115,18 +131,33 @@ async function findLogByMessageId(supabase, messageId) {
   return logs?.[0] ?? null;
 }
 
-/** Opens: match log not yet marked opened (treat NULL like false). */
-async function findLogForOpenFallback(supabase, recipientEmail, subject) {
+/**
+ * Fallback when message-id does not match (imports, encoding) but email + subject do.
+ * Compares normalized subject; scans recent rows for this recipient.
+ */
+async function findLogByEmailNormalizedSubject(
+  supabase,
+  recipientEmail,
+  subject,
+  { requireOpenedFalse = false } = {}
+) {
+  const want = normalizeSubject(subject);
+  if (!recipientEmail || !want) return null;
+
   const { data: logs, error } = await supabase
     .from("email_logs")
     .select("*")
     .ilike("email", recipientEmail)
-    .eq("subject", subject)
-    .or("opened.is.null,opened.eq.false")
     .order("created_at", { ascending: false })
-    .limit(1);
+    .limit(40);
   if (error) throw error;
-  return logs?.[0] ?? null;
+
+  for (const row of logs || []) {
+    if (normalizeSubject(row.subject) !== want) continue;
+    if (requireOpenedFalse && row.opened === true) continue;
+    return row;
+  }
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -162,6 +193,16 @@ export default async function handler(req, res) {
 
   if (Array.isArray(payload) && payload.length > 0) {
     payload = payload[0];
+  }
+
+  if (typeof payload.payload === "string") {
+    try {
+      payload = JSON.parse(payload.payload);
+    } catch {
+      /* keep payload */
+    }
+  } else if (payload.record && typeof payload.record === "object") {
+    payload = payload.record;
   }
 
   const event = extractEvent(payload);
@@ -208,19 +249,15 @@ export default async function handler(req, res) {
     }
 
     if (!log && isOpenEvent(event) && recipientEmail && subject) {
-      log = await findLogForOpenFallback(supabase, recipientEmail, subject);
+      log = await findLogByEmailNormalizedSubject(supabase, recipientEmail, subject, {
+        requireOpenedFalse: true,
+      });
     }
 
     if (!log && isClickEvent(event) && recipientEmail && subject) {
-      const { data: logs, error: fbErr } = await supabase
-        .from("email_logs")
-        .select("*")
-        .ilike("email", recipientEmail)
-        .eq("subject", subject)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (fbErr) throw fbErr;
-      log = logs?.[0] ?? null;
+      log = await findLogByEmailNormalizedSubject(supabase, recipientEmail, subject, {
+        requireOpenedFalse: false,
+      });
     }
 
     if (!log) {
