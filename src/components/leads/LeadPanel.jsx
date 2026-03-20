@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Save, Loader2, FileDown, FileX } from "lucide-react";
+import { X, Save, Loader2, FileDown, FileX, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { apiPost } from "@/lib/serverApi";
 import { useQueryClient } from "@tanstack/react-query";
@@ -114,7 +114,14 @@ function DocsSection({ lead }) {
 export default function LeadPanel({ lead, onClose, isNew = false }) {
   const [form, setForm] = useState(lead || { status: "New" });
   const [saving, setSaving] = useState(false);
+  const [enrichingHunter, setEnrichingHunter] = useState(false);
   const qc = useQueryClient();
+
+  const canHunterEnrich =
+    !isNew &&
+    lead?.id &&
+    (!form.email?.trim() || !form.owner_name?.trim()) &&
+    Boolean(form.website?.trim() || form.business_name?.trim());
 
   useEffect(() => {
     setForm(lead || { status: "New" });
@@ -145,6 +152,21 @@ export default function LeadPanel({ lead, onClose, isNew = false }) {
     qc.invalidateQueries({ queryKey: ["leads"] });
     setSaving(false);
     onClose();
+  };
+
+  const handleHunterEnrichLead = async () => {
+    if (!lead?.id) return;
+    setEnrichingHunter(true);
+    try {
+      await apiPost("/api/enrich-leads-hunter", { lead_ids: [lead.id], limit: 1 });
+      const { data, error } = await supabase.from("leads").select("*").eq("id", lead.id).single();
+      if (!error && data) setForm(data);
+      qc.invalidateQueries({ queryKey: ["leads"] });
+      alert("Updated from Hunter.io where a match was found.");
+    } catch (e) {
+      alert(e?.message || "Hunter enrichment failed");
+    }
+    setEnrichingHunter(false);
   };
 
   return (
@@ -274,7 +296,23 @@ export default function LeadPanel({ lead, onClose, isNew = false }) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 flex-wrap">
+          {canHunterEnrich && (
+            <Button
+              type="button"
+              variant="outline"
+              className="mr-auto border-amber-200 text-amber-900 hover:bg-amber-50"
+              onClick={handleHunterEnrichLead}
+              disabled={saving || enrichingHunter}
+            >
+              {enrichingHunter ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4 mr-2 text-amber-500" />
+              )}
+              Fill from Hunter
+            </Button>
+          )}
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSave} disabled={saving} className="bg-[#00c896] hover:bg-[#00b085] text-white">
             {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}

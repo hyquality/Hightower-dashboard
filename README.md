@@ -8,6 +8,7 @@ Standalone leads dashboard with **Supabase** (Postgres + Auth + Storage), **Verc
 - Campaigns (draft / launch) with audience filters
 - Email log with open/click/delivery/bounce updates from Brevo webhooks
 - Lead documents: files in Supabase Storage bucket `lead-documents`, downloaded via signed URLs from `/api/documents/signed-url`
+- Optional **Hunter.io** enrichment: `POST /api/enrich-leads-hunter` fills missing **email** and **owner name** via [Domain Search](https://hunter.io/api-documentation/v2#domain-search) (uses `website` domain or `business_name`)
 
 ## Local development
 
@@ -49,6 +50,7 @@ npm run dev
    | `BREVO_WEBHOOK_SECRET` | Server (recommended) |
    | `PUBLIC_LEAD_SITE_ORIGIN` | Server — comma-separated origins for CORS on public lead APIs (e.g. `https://www.hightowerfunding.com`) |
    | `PUBLIC_FORM_SECRET` | Server (optional) — if set, lead site must send `x-form-secret` header or `form_secret` in JSON / multipart field |
+   | `HUNTER_IO_API_KEY` | Server (optional) — enables **Enrich with Hunter** in the leads UI (`/api/enrich-leads-hunter`) |
 
 4. Redeploy after saving env vars.
 

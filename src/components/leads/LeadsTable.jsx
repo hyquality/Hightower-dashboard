@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, SlidersHorizontal, Star, Plus, ChevronLeft, ChevronRight, Send, ChevronUp, ChevronDown } from "lucide-react";
+import { Search, SlidersHorizontal, Star, Plus, ChevronLeft, ChevronRight, Send, ChevronUp, ChevronDown, Sparkles, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -76,6 +76,7 @@ export default function LeadsTable({
   filterStatus, setFilterStatus,
   filterSource, setFilterSource,
   allLeads, onRowClick, onAddClick, onBulkSend,
+  onHunterEnrichBulk, onHunterEnrichSelected, hunterEnriching,
 }) {
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -162,6 +163,30 @@ export default function LeadsTable({
           {selectedIds.size > 0 && (
             <Button onClick={() => onBulkSend(selectedLeads)} className="bg-[#00c896] hover:bg-[#00b085] text-white whitespace-nowrap">
               <Send className="w-4 h-4 mr-1" /> Send Campaign ({selectedIds.size})
+            </Button>
+          )}
+          {typeof onHunterEnrichBulk === "function" && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={hunterEnriching}
+              onClick={() => onHunterEnrichBulk()}
+              className="whitespace-nowrap border-slate-200"
+            >
+              {hunterEnriching ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1 text-amber-500" />}
+              Enrich missing
+            </Button>
+          )}
+          {typeof onHunterEnrichSelected === "function" && selectedIds.size > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={hunterEnriching}
+              onClick={() => onHunterEnrichSelected(selectedLeads.map((l) => l.id))}
+              className="whitespace-nowrap border-slate-200"
+            >
+              <Sparkles className="w-4 h-4 mr-1 text-amber-500" />
+              Enrich selected ({selectedIds.size})
             </Button>
           )}
           <Button onClick={onAddClick} className="bg-[#1a2fa8] hover:bg-[#2a3fbf] text-white whitespace-nowrap">

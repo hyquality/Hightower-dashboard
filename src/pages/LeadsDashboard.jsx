@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchAllLeads } from "@/lib/supabaseQueries";
+import { apiPost } from "@/lib/serverApi";
 import StatsRow from "@/components/leads/StatsRow";
 import LeadsCharts from "@/components/leads/LeadsCharts";
 import LeadsTable from "@/components/leads/LeadsTable";
@@ -16,6 +17,27 @@ export default function LeadsDashboard() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [bulkSendLeads, setBulkSendLeads] = useState(null);
+  const [hunterEnriching, setHunterEnriching] = useState(false);
+  const qc = useQueryClient();
+
+  const runHunterEnrich = async (lead_ids) => {
+    setHunterEnriching(true);
+    try {
+      const r = await apiPost("/api/enrich-leads-hunter", {
+        limit: 25,
+        ...(lead_ids?.length ? { lead_ids } : {}),
+      });
+      const errCount = r.errors?.length || 0;
+      alert(
+        `Hunter.io: processed ${r.processed}, enriched ${r.enriched}, skipped ${r.skipped}.` +
+          (errCount ? ` ${errCount} error(s) — check server logs.` : "")
+      );
+      qc.invalidateQueries({ queryKey: ["leads"] });
+    } catch (e) {
+      alert(e?.message || "Enrichment failed");
+    }
+    setHunterEnriching(false);
+  };
 
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ["leads"],
@@ -58,6 +80,9 @@ export default function LeadsDashboard() {
           onRowClick={setSelectedLead}
           onAddClick={() => setShowAddPanel(true)}
           onBulkSend={setBulkSendLeads}
+          onHunterEnrichBulk={() => runHunterEnrich()}
+          onHunterEnrichSelected={(ids) => runHunterEnrich(ids)}
+          hunterEnriching={hunterEnriching}
         />
       </div>
 
