@@ -60,6 +60,8 @@ npm run dev
 
    Recommended: **delivered**, **click**, **opened**, **unique_opened**, **proxy_open**, **unique_proxy_open**, and bounce types you care about.
 
+   The webhook treats a **click** as proof the message was engaged with and also sets **Opened** when Brevo never sends a separate open event (common with image blocking / link-only interaction).
+
 3. **Webhook auth:** set `BREVO_WEBHOOK_SECRET` in Vercel. Configure Brevo to send the same value as either:
    - header `x-webhook-secret`, or  
    - `Authorization: Bearer <secret>`  

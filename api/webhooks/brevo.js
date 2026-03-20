@@ -3,7 +3,11 @@ import { verifyBrevoWebhook } from "../_lib/brevoWebhookAuth.js";
 
 /**
  * Brevo transactional webhooks: https://developers.brevo.com/docs/transactional-webhooks
- * Opens often arrive as proxy_open / unique_proxy_open (Gmail image prefetch, etc.), not "opened".
+ *
+ * Notes:
+ * - Opens often arrive as proxy_open / unique_proxy_open (Gmail image prefetch).
+ * - Clicks can be recorded without an "open" pixel (preview panes, some clients) — we set opened when a click is recorded.
+ * - JSON keys may vary in casing; payload may be nested under `data` or `items`.
  */
 
 function normalizeMessageId(raw) {
@@ -13,13 +17,65 @@ function normalizeMessageId(raw) {
     .trim();
 }
 
+/** Collect root objects to read fields from (top-level + common nests). */
+function walkPayloadRoots(payload) {
+  const roots = [];
+  if (!payload || typeof payload !== "object") return roots;
+  roots.push(payload);
+  if (payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)) {
+    roots.push(payload.data);
+  }
+  if (Array.isArray(payload.items)) {
+    for (const item of payload.items) {
+      if (item && typeof item === "object") roots.push(item);
+    }
+  }
+  return roots;
+}
+
+/** Case-insensitive match for message-id style keys. */
 function extractMessageId(payload) {
-  const raw =
-    payload["message-id"] ??
-    payload.messageId ??
-    payload.message_id ??
-    payload.MessageId;
-  return normalizeMessageId(raw);
+  for (const root of walkPayloadRoots(payload)) {
+    for (const [k, v] of Object.entries(root)) {
+      if (v == null || v === "") continue;
+      const normKey = k.toLowerCase().replace(/_/g, "-");
+      if (normKey === "message-id" || normKey === "messageid") {
+        const n = normalizeMessageId(v);
+        if (n) return n;
+      }
+    }
+  }
+  return "";
+}
+
+function extractEvent(payload) {
+  for (const root of walkPayloadRoots(payload)) {
+    const e = root.event ?? root.Event ?? root.type ?? root.Type;
+    if (e != null && String(e).trim() !== "") {
+      return String(e).toLowerCase();
+    }
+  }
+  return "";
+}
+
+function extractEmail(payload) {
+  for (const root of walkPayloadRoots(payload)) {
+    const e = root.email ?? root.Email;
+    if (e != null && String(e).trim() !== "") {
+      return String(e).trim().toLowerCase();
+    }
+  }
+  return "";
+}
+
+function extractSubject(payload) {
+  for (const root of walkPayloadRoots(payload)) {
+    const s = root.subject ?? root.Subject;
+    if (s != null && String(s).trim() !== "") {
+      return String(s).trim();
+    }
+  }
+  return "";
 }
 
 function isOpenEvent(event) {
@@ -48,6 +104,31 @@ function isBounceEvent(event) {
   );
 }
 
+async function findLogByMessageId(supabase, messageId) {
+  const { data: logs, error } = await supabase
+    .from("email_logs")
+    .select("*")
+    .eq("message_id", messageId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  return logs?.[0] ?? null;
+}
+
+/** Opens: match log not yet marked opened (treat NULL like false). */
+async function findLogForOpenFallback(supabase, recipientEmail, subject) {
+  const { data: logs, error } = await supabase
+    .from("email_logs")
+    .select("*")
+    .ilike("email", recipientEmail)
+    .eq("subject", subject)
+    .or("opened.is.null,opened.eq.false")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  return logs?.[0] ?? null;
+}
+
 export default async function handler(req, res) {
   if (req.method === "GET") {
     return res.status(200).json({ ok: true });
@@ -61,6 +142,13 @@ export default async function handler(req, res) {
   }
 
   let payload = req.body;
+  if (Buffer.isBuffer(payload)) {
+    try {
+      payload = JSON.parse(payload.toString("utf8"));
+    } catch {
+      return res.status(200).json({ ok: true });
+    }
+  }
   if (typeof payload === "string") {
     try {
       payload = JSON.parse(payload);
@@ -72,12 +160,14 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  const event = String(payload.event || "").toLowerCase();
+  if (Array.isArray(payload) && payload.length > 0) {
+    payload = payload[0];
+  }
+
+  const event = extractEvent(payload);
   const messageId = extractMessageId(payload);
-  const recipientEmail = payload.email
-    ? String(payload.email).trim().toLowerCase()
-    : "";
-  const subject = payload.subject ? String(payload.subject).trim() : "";
+  const recipientEmail = extractEmail(payload);
+  const subject = extractSubject(payload);
 
   if (!event) {
     return res.status(200).json({ ok: true });
@@ -87,7 +177,8 @@ export default async function handler(req, res) {
   if (isOpenEvent(event)) {
     update = { opened: true };
   } else if (isClickEvent(event)) {
-    update = { clicked: true };
+    // Clicks often fire without a separate open webhook (clients that block images / previews).
+    update = { clicked: true, opened: true };
   } else if (isDeliveredEvent(event)) {
     update = { status: "Delivered" };
   } else if (isBounceEvent(event)) {
@@ -96,9 +187,15 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, skipped: event });
   }
 
-  // Opens need message-id OR (email + subject) for fallback — other events already work with message-id.
-  if (!messageId && !(isOpenEvent(event) && recipientEmail && subject)) {
-    return res.status(200).json({ ok: true, note: "no message-id or email+subject" });
+  if (
+    !messageId &&
+    !(isOpenEvent(event) && recipientEmail && subject)
+  ) {
+    if (isClickEvent(event) && recipientEmail && subject) {
+      // Allow click+open inference when message-id is missing (rare).
+    } else if (!isClickEvent(event)) {
+      return res.status(200).json({ ok: true, note: "no message-id or email+subject" });
+    }
   }
 
   try {
@@ -107,28 +204,23 @@ export default async function handler(req, res) {
     let log = null;
 
     if (messageId) {
-      const { data: logs, error: qErr } = await supabase
-        .from("email_logs")
-        .select("*")
-        .eq("message_id", messageId)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (qErr) throw qErr;
-      log = logs?.[0];
+      log = await findLogByMessageId(supabase, messageId);
     }
 
-    // Some clients only send proxy_open; message-id format can differ from API response — match recent log.
     if (!log && isOpenEvent(event) && recipientEmail && subject) {
+      log = await findLogForOpenFallback(supabase, recipientEmail, subject);
+    }
+
+    if (!log && isClickEvent(event) && recipientEmail && subject) {
       const { data: logs, error: fbErr } = await supabase
         .from("email_logs")
         .select("*")
         .ilike("email", recipientEmail)
         .eq("subject", subject)
-        .eq("opened", false)
         .order("created_at", { ascending: false })
         .limit(1);
       if (fbErr) throw fbErr;
-      log = logs?.[0];
+      log = logs?.[0] ?? null;
     }
 
     if (!log) {
