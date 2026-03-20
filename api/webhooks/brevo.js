@@ -1,6 +1,53 @@
 import { getServiceSupabase } from "../_lib/supabaseServer.js";
 import { verifyBrevoWebhook } from "../_lib/brevoWebhookAuth.js";
 
+/**
+ * Brevo transactional webhooks: https://developers.brevo.com/docs/transactional-webhooks
+ * Opens often arrive as proxy_open / unique_proxy_open (Gmail image prefetch, etc.), not "opened".
+ */
+
+function normalizeMessageId(raw) {
+  if (raw == null || raw === "") return "";
+  return String(raw)
+    .replace(/^<|>$/g, "")
+    .trim();
+}
+
+function extractMessageId(payload) {
+  const raw =
+    payload["message-id"] ??
+    payload.messageId ??
+    payload.message_id ??
+    payload.MessageId;
+  return normalizeMessageId(raw);
+}
+
+function isOpenEvent(event) {
+  return (
+    event === "opened" ||
+    event === "unique_opened" ||
+    event === "open" ||
+    event === "proxy_open" ||
+    event === "unique_proxy_open"
+  );
+}
+
+function isClickEvent(event) {
+  return event === "click" || event === "clicked";
+}
+
+function isDeliveredEvent(event) {
+  return event === "delivered" || event === "delivery";
+}
+
+function isBounceEvent(event) {
+  return (
+    event === "hard_bounce" ||
+    event === "soft_bounce" ||
+    event === "bounce"
+  );
+}
+
 export default async function handler(req, res) {
   if (req.method === "GET") {
     return res.status(200).json({ ok: true });
@@ -26,46 +73,71 @@ export default async function handler(req, res) {
   }
 
   const event = String(payload.event || "").toLowerCase();
-  const rawMessageId =
-    payload["message-id"] || payload.messageId || payload.message_id || "";
-  const messageId = String(rawMessageId)
-    .replace(/^<|>$/g, "")
-    .trim();
+  const messageId = extractMessageId(payload);
+  const recipientEmail = payload.email
+    ? String(payload.email).trim().toLowerCase()
+    : "";
+  const subject = payload.subject ? String(payload.subject).trim() : "";
 
-  if (!event || !messageId) {
+  if (!event) {
     return res.status(200).json({ ok: true });
   }
 
   let update = null;
-  if (event === "opened" || event === "unique_opened" || event === "open") {
+  if (isOpenEvent(event)) {
     update = { opened: true };
-  } else if (event === "click" || event === "clicked") {
+  } else if (isClickEvent(event)) {
     update = { clicked: true };
-  } else if (event === "delivered" || event === "delivery") {
+  } else if (isDeliveredEvent(event)) {
     update = { status: "Delivered" };
-  } else if (
-    event === "hard_bounce" ||
-    event === "soft_bounce" ||
-    event === "bounce"
-  ) {
+  } else if (isBounceEvent(event)) {
     update = { status: "Bounced" };
   } else {
     return res.status(200).json({ ok: true, skipped: event });
   }
 
+  // Opens need message-id OR (email + subject) for fallback — other events already work with message-id.
+  if (!messageId && !(isOpenEvent(event) && recipientEmail && subject)) {
+    return res.status(200).json({ ok: true, note: "no message-id or email+subject" });
+  }
+
   try {
     const supabase = getServiceSupabase();
-    const { data: logs, error: qErr } = await supabase
-      .from("email_logs")
-      .select("*")
-      .eq("message_id", messageId)
-      .order("created_at", { ascending: false })
-      .limit(1);
 
-    if (qErr) throw qErr;
-    const log = logs?.[0];
+    let log = null;
+
+    if (messageId) {
+      const { data: logs, error: qErr } = await supabase
+        .from("email_logs")
+        .select("*")
+        .eq("message_id", messageId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (qErr) throw qErr;
+      log = logs?.[0];
+    }
+
+    // Some clients only send proxy_open; message-id format can differ from API response — match recent log.
+    if (!log && isOpenEvent(event) && recipientEmail && subject) {
+      const { data: logs, error: fbErr } = await supabase
+        .from("email_logs")
+        .select("*")
+        .ilike("email", recipientEmail)
+        .eq("subject", subject)
+        .eq("opened", false)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (fbErr) throw fbErr;
+      log = logs?.[0];
+    }
+
     if (!log) {
-      return res.status(200).json({ ok: true, note: "no log for message_id" });
+      return res.status(200).json({
+        ok: true,
+        note: "no matching email_log",
+        event,
+        had_message_id: Boolean(messageId),
+      });
     }
 
     const { error: uErr } = await supabase

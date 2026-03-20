@@ -56,7 +56,9 @@ npm run dev
 
    `https://YOUR_VERCEL_DOMAIN/api/webhooks/brevo`
 
-   Subscribe to open, click, delivery, bounce (names must map to handlers in [`api/webhooks/brevo.js`](api/webhooks/brevo.js)).
+   In Brevo, enable **all** relevant transactional events. Many “opens” (especially Gmail and other clients) are sent as **`proxy_open`** / **`unique_proxy_open`**, not plain **`opened`** — the app handles those. See [Brevo transactional webhooks](https://developers.brevo.com/docs/transactional-webhooks).
+
+   Recommended: **delivered**, **click**, **opened**, **unique_opened**, **proxy_open**, **unique_proxy_open**, and bounce types you care about.
 
 3. **Webhook auth:** set `BREVO_WEBHOOK_SECRET` in Vercel. Configure Brevo to send the same value as either:
    - header `x-webhook-secret`, or  
