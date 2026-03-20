@@ -66,12 +66,15 @@ Configure the static site’s `api-config.js` with the dashboard origin as `wind
 
 Set `PUBLIC_LEAD_SITE_ORIGIN` and `PUBLIC_FORM_SECRET` in production.
 
-#### If `/api/apply` (or OPTIONS preflight) returns **404**
+#### If `/api/apply` fails, Safari shows **no status / no response headers**, or OPTIONS fails
 
-1. **Redeploy** after pulling the latest dashboard code (routes use Vercel’s Web `POST` / `OPTIONS` exports under `/api/*.js`).
-2. In the Vercel project → **Settings → General**, set **Root Directory** to the repo root (the folder that contains `api/` and `package.json`). If Root Directory points at a subfolder without `api/`, every `/api/*` route will 404.
-3. Confirm the marketing site calls **`/api/apply`** (not `/api/public/apply`).
-4. After deploy, `GET` or `POST` to `/api/apply` should **not** be a Vercel HTML 404 page; wrong root directory is the most common cause.
+That pattern is usually **CORS**: the browser blocks the response before your app sees it.
+
+1. **`PUBLIC_LEAD_SITE_ORIGIN`** must include the **exact** origin the browser sends (check the Network tab → Request Headers → `Origin`). Example: form on `https://www.hightowerfunding.com` → set `https://www.hightowerfunding.com` (not only `https://hightowerfunding.com` unless you use that URL). You can list both, comma-separated. Trailing slashes are normalized away on the server.
+2. **Redeploy** the dashboard after changing env vars.
+3. **Smoke test:** open `https://YOUR_DEPLOYMENT.vercel.app/api/health` — you should see `{"ok":true}`. From the lead site, the Network tab should show **OPTIONS** then **POST** to `/api/apply` with status **204** / **200** and response headers including `access-control-allow-origin`.
+4. **Root Directory** in Vercel must be the repo root (folder containing `api/`). If it’s wrong, you get real **404**s (not “empty” responses).
+5. Confirm paths are **`/api/apply`**, **`/api/save-application`**, **`/api/upload-documents`** (not `/api/public/...`).
 
 ## Brevo
 

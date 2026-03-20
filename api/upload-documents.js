@@ -62,20 +62,7 @@ function mergeDocUris(existing, newPaths) {
   return [...set].join(",");
 }
 
-export async function OPTIONS(request) {
-  const cors = corsHeadersFor(request);
-  if (cors === null) {
-    return jsonResponse(null, 403, { error: "Origin not allowed" });
-  }
-  return emptyResponse(cors, 204);
-}
-
-export async function POST(request) {
-  const cors = corsHeadersFor(request);
-  if (cors === null) {
-    return jsonResponse(null, 403, { error: "Origin not allowed" });
-  }
-
+async function handlePost(request, cors) {
   const contentType = request.headers.get("content-type") || "";
   if (!contentType.toLowerCase().includes("multipart/form-data")) {
     return jsonResponse(cors, 415, { error: "multipart/form-data required" });
@@ -167,3 +154,26 @@ export async function POST(request) {
     return jsonResponse(cors, 500, { error: e.message });
   }
 }
+
+export default {
+  async fetch(request) {
+    const cors = corsHeadersFor(request);
+
+    if (request.method === "OPTIONS") {
+      if (cors === null) {
+        return jsonResponse(null, 403, { error: "Origin not allowed" });
+      }
+      return emptyResponse(cors, 204);
+    }
+
+    if (request.method === "POST") {
+      if (cors === null) {
+        return jsonResponse(null, 403, { error: "Origin not allowed" });
+      }
+      return handlePost(request, cors);
+    }
+
+    const fallback = cors || corsHeadersFor({ headers: new Headers() });
+    return jsonResponse(fallback, 405, { error: "Method not allowed" });
+  },
+};

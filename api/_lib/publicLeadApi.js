@@ -1,8 +1,14 @@
 /**
  * CORS + optional shared secret for public lead-site endpoints.
  * Set PUBLIC_LEAD_SITE_ORIGIN to comma-separated allowed origins (e.g. https://www.hightowerfunding.com).
- * If unset, Access-Control-Allow-Origin is * (fine for non-credentialed POSTs; lock down in production).
+ * Comparison is case-insensitive and ignores trailing slashes so https://www.hightowerfunding.com/ still matches.
+ * If unset, Access-Control-Allow-Origin is * (non-credentialed POSTs only; lock down in production).
  */
+
+export function normalizeOrigin(o) {
+  if (!o) return "";
+  return String(o).trim().replace(/\/+$/, "").toLowerCase();
+}
 
 export function getAllowedOrigins() {
   const raw = process.env.PUBLIC_LEAD_SITE_ORIGIN || "";
@@ -25,24 +31,35 @@ export function getIncomingHeader(reqLike, name) {
 
 /** @returns {Record<string, string> | null} null = browser origin not allowed */
 export function corsHeadersFor(reqLike) {
-  const origins = getAllowedOrigins();
-  const origin = getIncomingHeader(reqLike, "origin");
-  if (origin && origins.length > 0) {
-    if (!origins.includes(origin)) return null;
-    return {
-      "Access-Control-Allow-Origin": origin,
-      Vary: "Origin",
-    };
-  }
+  const allowedRaw = getAllowedOrigins();
+  const allowedNorm = allowedRaw.map(normalizeOrigin).filter(Boolean);
+  const originHeader = getIncomingHeader(reqLike, "origin");
+
   const base = {
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, x-form-secret",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "Authorization, Content-Type, X-Form-Secret, x-form-secret, Accept, Origin",
     "Access-Control-Max-Age": "86400",
   };
-  if (origins.length === 0) {
+
+  if (allowedNorm.length === 0) {
     return { ...base, "Access-Control-Allow-Origin": "*" };
   }
-  return { ...base, "Access-Control-Allow-Origin": origin || "*" };
+
+  if (!originHeader) {
+    return { ...base, "Access-Control-Allow-Origin": "*" };
+  }
+
+  const reqNorm = normalizeOrigin(originHeader);
+  if (!allowedNorm.includes(reqNorm)) {
+    return null;
+  }
+
+  return {
+    ...base,
+    "Access-Control-Allow-Origin": originHeader,
+    Vary: "Origin",
+  };
 }
 
 /** @returns {boolean} false if browser request from disallowed origin */
