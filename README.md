@@ -47,8 +47,31 @@ npm run dev
    | `PUBLIC_APP_URL` | Server — `https://your-domain` (no trailing slash); builds logo URL for outbound email `<img>` (`/public/hightower-logo-email.png`) |
    | `BRAND_LOGO_URL` | Server (optional) — full logo URL; overrides `PUBLIC_APP_URL` + path |
    | `BREVO_WEBHOOK_SECRET` | Server (recommended) |
+   | `PUBLIC_LEAD_SITE_ORIGIN` | Server — comma-separated origins for CORS on public lead APIs (e.g. `https://www.hightowerfunding.com`) |
+   | `PUBLIC_FORM_SECRET` | Server (optional) — if set, lead site must send `x-form-secret` header or `form_secret` in JSON / multipart field |
 
 4. Redeploy after saving env vars.
+
+### Public lead site APIs
+
+The static marketing site (`hightowerfunding`) submits leads and documents to these **unauthenticated** routes (service role on the server — never expose `SUPABASE_SERVICE_ROLE_KEY` in the static site):
+
+| Path | Purpose |
+|------|--------|
+| `POST /api/apply` | JSON body: homepage form → insert `leads`, returns `{ id }` (use as `lead_id` on upload page). |
+| `POST /api/save-application` | JSON: `{ lead_id, email?, type: "application_form", data }` → appends JSON to `leads.notes`. |
+| `POST /api/upload-documents` | `multipart/form-data`: fields `lead_id`, `email`, `phone`, optional `form_secret`; files `file_0` … `file_2` → Storage `lead-documents` under `applications/{lead_id}/…`, updates `doc_file_uris`, `docs_submitted_date`, `docs_count`. |
+
+Configure the static site’s `api-config.js` with the dashboard origin as `window.HT_API_BASE` (see the `hightowerfunding` repo). **Vercel request body limit** (~4.5 MB) applies to multipart uploads; very large PDFs may need a different upload strategy.
+
+Set `PUBLIC_LEAD_SITE_ORIGIN` and `PUBLIC_FORM_SECRET` in production.
+
+#### If `/api/apply` (or OPTIONS preflight) returns **404**
+
+1. **Redeploy** after pulling the latest dashboard code (routes use Vercel’s Web `POST` / `OPTIONS` exports under `/api/*.js`).
+2. In the Vercel project → **Settings → General**, set **Root Directory** to the repo root (the folder that contains `api/` and `package.json`). If Root Directory points at a subfolder without `api/`, every `/api/*` route will 404.
+3. Confirm the marketing site calls **`/api/apply`** (not `/api/public/apply`).
+4. After deploy, `GET` or `POST` to `/api/apply` should **not** be a Vercel HTML 404 page; wrong root directory is the most common cause.
 
 ## Brevo
 
@@ -86,6 +109,9 @@ npm run dev
 | `POST /api/send-to-leads` | Supabase user JWT |
 | `POST /api/documents/signed-url` | Supabase user JWT |
 | `POST /api/webhooks/brevo` | `BREVO_WEBHOOK_SECRET` (not user JWT) |
+| `POST /api/apply` | Optional `PUBLIC_FORM_SECRET`; CORS via `PUBLIC_LEAD_SITE_ORIGIN` |
+| `POST /api/save-application` | Same |
+| `POST /api/upload-documents` | Same (multipart) |
 
 ## Sign-in
 
