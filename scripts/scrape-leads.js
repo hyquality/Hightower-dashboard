@@ -13,12 +13,12 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { chromium } from 'playwright';
-import fetch from 'node:fetch';
 
 // Config
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const SCRAPER_DELAY_MS = process.env.SCRAPER_DELAY_MS || 1000;
+const SCRAPER_DELAY_MS = process.env.SCRAPER_DELAY_MS || 2000;
+const SCRAPER_TIMEOUT_MS = 15000; // Reduced timeout for resilience
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
@@ -96,7 +96,7 @@ async function scrapeGoogleMaps() {
         });
       }
       
-      console.log(`[Google Maps] Found ${listings.length)} results for "${query}"`);
+      console.log(`[Google Maps] Found ${listings.length} results for "${query}"`);
       await delay(SCRAPER_DELAY_MS);
       
     } catch (err) {
@@ -407,6 +407,72 @@ async function scrapeFMCSA() {
 }
 
 /**
+ * YellowPages Scraper
+ * Easier to scrape than Yelp/Google
+ */
+async function scrapeYellowPages() {
+  console.log('[YellowPages] Starting scrape...');
+  const results = [];
+  
+  const categories = [
+    { query: 'auto-repair', category: 'auto_repair' },
+    { query: 'beauty-salons', category: 'nail_salon' },
+    { query: 'hair-salons', category: 'hair_salon' },
+    { query: 'restaurants', category: 'restaurant' },
+  ];
+
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+
+  for (const { query, category } of categories) {
+    try {
+      console.log(`[YellowPages] Searching: ${query}`);
+      
+      const url = `https://www.yellowpages.com/search?search_terms=${query}&geo_location_terms=USA`;
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: SCRAPER_TIMEOUT_MS });
+      await page.waitForTimeout(2000);
+      
+      // Scroll to load more
+      await page.evaluate(() => window.scrollBy(0, 500));
+      await page.waitForTimeout(1000);
+      
+      const listings = await page.evaluate(() => {
+        const items = document.querySelectorAll('.result');
+        return Array.from(items).slice(0, 15).map(item => {
+          const name = item.querySelector('.business-name span')?.textContent?.trim();
+          const address = item.querySelector('.street-address')?.textContent?.trim();
+          const phone = item.querySelector('.phone')?.textContent?.trim();
+          const website = item.querySelector('.extra-links a')?.href;
+          return { name, address, phone, website };
+        }).filter(x => x.name);
+      });
+      
+      for (const listing of listings) {
+        results.push({
+          source: 'yellowpages',
+          source_id: `yp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          business_name: listing.name,
+          phone: listing.phone,
+          address: listing.address,
+          website: listing.website,
+          category,
+          scraped_at: new Date().toISOString(),
+        });
+      }
+      
+      console.log(`[YellowPages] Found ${listings.length} results for "${query}"`);
+      await delay(SCRAPER_DELAY_MS);
+      
+    } catch (err) {
+      console.error(`[YellowPages] Error:`, err.message.substring(0, 100));
+    }
+  }
+
+  await browser.close();
+  return results;
+}
+
+/**
  * Additional Sources - Web Scraper API integration
  * Using a general web scraping service for additional leads
  */
@@ -414,12 +480,9 @@ async function scrapeAdditionalSources() {
   console.log('[Additional Sources] Checking for new sources...');
   const results = [];
   
-  // Add more sources here as needed
-  // Examples:
-  // - YellowPages
-  // - BBB (Better Business Bureau)
-  // - Manta
-  // - Localeze
+  // Run YellowPages scraper
+  const ypResults = await scrapeYellowPages();
+  results.push(...ypResults);
   
   return results;
 }
