@@ -620,10 +620,9 @@ async function runScraper() {
       
       const { data, error } = await supabase
         .from('leads')
-        .upsert(batch, { 
-          onConflict: 'website',
-          ignoreDuplicates: true 
-        });
+        .insert(batch)
+        .onConflict('website')
+        .ignoreDuplicates();
 
       if (error) {
         console.error(`[Scraper] Error inserting batch:`, error);
