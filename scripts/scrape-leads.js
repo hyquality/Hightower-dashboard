@@ -536,15 +536,30 @@ async function runScraper() {
 
     console.log(`[Scraper] Unique leads after dedup: ${uniqueLeads.length}`);
 
+    // Map to existing database schema
+    const mappedLeads = uniqueLeads.map(lead => ({
+      business_name: lead.business_name,
+      phone: lead.phone,
+      website: lead.website,
+      address: lead.address,
+      source: lead.source,
+      source_id: lead.source_id,
+      city: lead.address?.split(',')[0] || null,
+      state: lead.address?.split(',')[1]?.trim() || null,
+      rating: lead.rating,
+      status: 'New',
+      scraped_date: lead.scraped_at ? lead.scraped_at.split('T')[0] : new Date().toISOString().split('T')[0],
+    }));
+
     // Insert in batches
     const batchSize = 100;
-    for (let i = 0; i < uniqueLeads.length; i += batchSize) {
-      const batch = uniqueLeads.slice(i, i + batchSize);
+    for (let i = 0; i < mappedLeads.length; i += batchSize) {
+      const batch = mappedLeads.slice(i, i + batchSize);
       
       const { data, error } = await supabase
         .from('leads')
         .upsert(batch, { 
-          onConflict: 'source,source_id',
+          onConflict: 'website',
           ignoreDuplicates: true 
         });
 
@@ -555,7 +570,7 @@ async function runScraper() {
       }
     }
 
-    console.log(`[Scraper] Successfully saved ${uniqueLeads.length} leads to Supabase`);
+    console.log(`[Scraper] Successfully saved ${mappedLeads.length} leads to Supabase`);
   }
 
   console.log('='.repeat(50));
