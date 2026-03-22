@@ -18,7 +18,8 @@ import { chromium } from 'playwright';
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SCRAPER_DELAY_MS = process.env.SCRAPER_DELAY_MS || 2000;
-const SCRAPER_TIMEOUT_MS = 15000; // Reduced timeout for resilience
+const SCRAPER_TIMEOUT_MS = 15000;
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
@@ -28,6 +29,73 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // ============================================
 // SCRAPER SOURCES
 // ============================================
+
+/**
+ * Google Places API Scraper
+ * Uses official Google Places API - no scraping needed!
+ */
+async function scrapeGooglePlaces() {
+  console.log('[Google Places API] Starting scrape...');
+  const results = [];
+  
+  if (!GOOGLE_API_KEY) {
+    console.log('[Google Places API] No API key, skipping...');
+    return results;
+  }
+
+  const searchQueries = [
+    { query: 'auto repair', category: 'auto_repair' },
+    { query: 'nail salon', category: 'nail_salon' },
+    { query: 'hair salon', category: 'hair_salon' },
+    { query: 'restaurant', category: 'restaurant' },
+  ];
+
+  const locations = [
+    'New York, NY',
+    'Los Angeles, CA',
+    'Chicago, IL',
+    'Houston, TX',
+    'Phoenix, AZ',
+  ];
+
+  for (const { query, category } of searchQueries) {
+    for (const location of locations) {
+      try {
+        console.log(`[Google Places] Searching: ${query} in ${location}`);
+        
+        // Text Search API
+        const textSearchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ' in ' + location)}&key=${GOOGLE_API_KEY}`;
+        
+        const response = await fetch(textSearchUrl);
+        const data = await response.json();
+        
+        if (data.results) {
+          for (const place of data.results.slice(0, 20)) {
+            results.push({
+              source: 'google_places',
+              source_id: place.place_id,
+              business_name: place.name,
+              address: place.formatted_address,
+              phone: place.formatted_phone_number,
+              website: place.website,
+              category,
+              rating: place.rating,
+              scraped_at: new Date().toISOString(),
+            });
+          }
+          console.log(`[Google Places] Found ${data.results.length} results for "${query}" in ${location}`);
+        }
+        
+        await delay(SCRAPER_DELAY_MS);
+        
+      } catch (err) {
+        console.error(`[Google Places] Error:`, err.message);
+      }
+    }
+  }
+
+  return results;
+}
 
 /**
  * Google Maps Scraper
@@ -500,20 +568,14 @@ async function runScraper() {
 
   // Run all scrapers
   try {
-    const [gmResults, yelpResults, bwResults, posResults, fmcsResults, additionalResults] = await Promise.allSettled([
-      scrapeGoogleMaps(),
-      scrapeYelp(),
+    const [googlePlacesResults, bwResults, additionalResults] = await Promise.allSettled([
+      scrapeGooglePlaces(),
       scrapeBuiltWith(),
-      scrapePOSDirectories(),
-      scrapeFMCSA(),
       scrapeAdditionalSources(),
     ]);
 
-    if (gmResults.status === 'fulfilled') allLeads.push(...gmResults.value);
-    if (yelpResults.status === 'fulfilled') allLeads.push(...yelpResults.value);
+    if (googlePlacesResults.status === 'fulfilled') allLeads.push(...googlePlacesResults.value);
     if (bwResults.status === 'fulfilled') allLeads.push(...bwResults.value);
-    if (posResults.status === 'fulfilled') allLeads.push(...posResults.value);
-    if (fmcsResults.status === 'fulfilled') allLeads.push(...fmcsResults.value);
     if (additionalResults.status === 'fulfilled') allLeads.push(...additionalResults.value);
 
   } catch (err) {
