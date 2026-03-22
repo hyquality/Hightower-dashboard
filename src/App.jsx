@@ -8,6 +8,9 @@ import LeadsDashboard from "./pages/LeadsDashboard";
 import Campaigns from "./pages/Campaigns";
 import EmailLog from "./pages/EmailLog";
 import Login from "./pages/Login";
+import DashboardHome from "./components/DashboardHome";
+import EmailAnalytics from "./components/EmailAnalytics";
+import LeadAnalytics from "./components/LeadAnalytics";
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isAuthenticated } = useAuth();
@@ -26,10 +29,13 @@ const AuthenticatedApp = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/LeadsDashboard" replace />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/dashboard" element={<DashboardHome />} />
       <Route path="/LeadsDashboard" element={<LeadsDashboard />} />
+      <Route path="/leads" element={<LeadAnalytics />} />
       <Route path="/Campaigns" element={<Campaigns />} />
       <Route path="/EmailLog" element={<EmailLog />} />
+      <Route path="/email-analytics" element={<EmailAnalytics />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

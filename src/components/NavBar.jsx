@@ -5,9 +5,12 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 
 const LINKS = [
+  { label: "Dashboard", path: "/dashboard" },
   { label: "Leads", path: "/LeadsDashboard" },
+  { label: "Lead Analytics", path: "/leads" },
   { label: "Campaigns", path: "/Campaigns" },
   { label: "Email Log", path: "/EmailLog" },
+  { label: "Email Analytics", path: "/email-analytics" },
 ];
 
 export default function NavBar() {
