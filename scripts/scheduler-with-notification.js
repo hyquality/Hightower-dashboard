@@ -5,7 +5,6 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { chromium } from 'playwright';
-import fetch from 'node-fetch';
 
 // Config
 const SUPABASE_URL = process.env.SUPABASE_URL;
