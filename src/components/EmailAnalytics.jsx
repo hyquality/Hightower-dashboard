@@ -1,20 +1,9 @@
 /**
  * Email Analytics - Hightower Branded
- * Real data from Supabase
+ * Clean design with real Supabase data
  */
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/AuthContext';
-
-const COLORS = {
-  primary: '#1a2fa8',
-  accent: '#00c896',
-  dark: '#0a1628',
-  card: '#111827',
-  border: '#1e293b',
-  text: '#e2e8f0',
-  textMuted: '#94a3b8',
-};
 
 export default function EmailAnalytics() {
   const [loading, setLoading] = useState(true);
@@ -32,18 +21,18 @@ export default function EmailAnalytics() {
   }, []);
 
   async function fetchEmailStats() {
+    setLoading(true);
     try {
-      const API_URL = import.meta.env.VITE_SUPABASE_URL || 'https://gxwurcysysqbulbbazph.supabase.co';
-      const API_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const API_URL = 'https://gxwurcysysqbulbbazph.supabase.co';
+      const API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4d3VyY3lzeXNxYnVsYmJhenBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMjczMDYsImV4cCI6MjA4OTYwMzMwNn0.RlB52DP8mf5H0WjHkd0K_fJ1dLVQ0Z2Rr7ZVJ1qO1Z0';
       
-      // Fetch email logs
       const res = await fetch(`${API_URL}/rest/v1/email_logs?select=*&order(sent_at,desc)&limit=50`, {
         headers: {
           'apikey': API_KEY,
           'Authorization': `Bearer ${API_KEY}`
         }
       });
-      const logs = await res.json();
+      const logs = res.ok ? await res.json() : [];
       
       const sent = logs?.length || 0;
       const delivered = logs?.filter(l => l.delivered)?.length || 0;
@@ -72,20 +61,20 @@ export default function EmailAnalytics() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#1a2fa8] border-t-transparent"></div>
+        <div className="w-8 h-8 border-4 border-[#1a2fa8] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-6 bg-[#0a1628] min-h-screen">
-      <div className="flex justify-between items-center">
+    <div className="p-4 md:p-8 space-y-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Email Analytics</h1>
           <p className="text-[#94a3b8]">Track your email campaign performance</p>
         </div>
-        <button onClick={fetchEmailStats} className="p-2 bg-[#111827] text-[#e2e8f0] rounded-lg border border-[#1e293b] hover:border-[#00c896]">
-          ↻
+        <button onClick={fetchEmailStats} className="btn-secondary flex items-center gap-2 self-start">
+          ↻ Refresh
         </button>
       </div>
 
@@ -98,41 +87,25 @@ export default function EmailAnalytics() {
         <MetricCard label="Bounced" value={stats.bounced} color="#ef4444" />
       </div>
 
-      {/* Charts placeholder - would need recharts integration */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-[#111827] rounded-xl p-6 border border-[#1e293b]">
-          <h3 className="text-lg font-semibold text-white mb-4">Open Rate Trend</h3>
-          <div className="h-48 flex items-center justify-center text-[#94a3b8]">
-            {openRate}% overall open rate
-          </div>
-        </div>
-        <div className="bg-[#111827] rounded-xl p-6 border border-[#1e293b]">
-          <h3 className="text-lg font-semibold text-white mb-4">Click Rate Trend</h3>
-          <div className="h-48 flex items-center justify-center text-[#94a3b8]">
-            {clickRate}% overall click rate
-          </div>
-        </div>
-      </div>
-
       {/* Recent Emails Table */}
-      <div className="bg-[#111827] rounded-xl p-6 border border-[#1e293b]">
+      <div className="card">
         <h3 className="text-lg font-semibold text-white mb-4">Recent Emails</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#1e293b]">
-                <th className="text-left py-3 px-4 text-[#94a3b8] font-medium">Recipient</th>
-                <th className="text-left py-3 px-4 text-[#94a3b8] font-medium">Subject</th>
-                <th className="text-center py-3 px-4 text-[#94a3b8] font-medium">Sent</th>
-                <th className="text-center py-3 px-4 text-[#94a3b8] font-medium">Opened</th>
-                <th className="text-center py-3 px-4 text-[#94a3b8] font-medium">Clicked</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-[#94a3b8] uppercase">Recipient</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-[#94a3b8] uppercase">Subject</th>
+                <th className="text-center py-3 px-4 text-xs font-medium text-[#94a3b8] uppercase">Sent</th>
+                <th className="text-center py-3 px-4 text-xs font-medium text-[#94a3b8] uppercase">Opened</th>
+                <th className="text-center py-3 px-4 text-xs font-medium text-[#94a3b8] uppercase">Clicked</th>
               </tr>
             </thead>
             <tbody>
-              {stats.recentLogs.slice(0, 10).map((log, idx) => (
-                <tr key={idx} className="border-b border-[#1e293b]/50 hover:bg-[#0a1628]">
-                  <td className="py-3 px-4 text-white">{log.recipient_email}</td>
-                  <td className="py-3 px-4 text-[#94a3b8] truncate max-w-xs">{log.subject}</td>
+              {stats.recentLogs.slice(0, 15).map((log, idx) => (
+                <tr key={idx} className="border-b border-[#1e293b]/50 hover:bg-[#0a1628]/50">
+                  <td className="py-3 px-4 text-white">{log.recipient_email || 'N/A'}</td>
+                  <td className="py-3 px-4 text-[#94a3b8] truncate max-w-xs">{log.subject || '-'}</td>
                   <td className="py-3 px-4 text-center text-[#94a3b8]">
                     {log.sent_at ? new Date(log.sent_at).toLocaleDateString() : '-'}
                   </td>
@@ -161,15 +134,13 @@ export default function EmailAnalytics() {
 
 function MetricCard({ label, value, subValue, color }) {
   return (
-    <div className="bg-[#111827] rounded-xl p-4 border border-[#1e293b]">
-      <div className="flex items-center gap-2">
+    <div className="card">
+      <div className="flex items-center gap-2 mb-2">
         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
         <span className="text-[#94a3b8] text-sm">{label}</span>
       </div>
-      <div className="mt-2">
-        <span className="text-2xl font-bold text-white">{value.toLocaleString()}</span>
-        {subValue && <span className="text-[#94a3b8] text-sm ml-2">{subValue}</span>}
-      </div>
+      <p className="text-2xl font-bold text-white">{value.toLocaleString()}</p>
+      {subValue && <p className="text-[#94a3b8] text-sm">{subValue} rate</p>}
     </div>
   );
 }

@@ -1,19 +1,9 @@
 /**
  * Lead Analytics - Hightower Branded
- * Real data from Supabase
+ * Clean design with real Supabase data
  */
 
 import { useState, useEffect } from 'react';
-
-const COLORS = {
-  primary: '#1a2fa8',
-  accent: '#00c896',
-  dark: '#0a1628',
-  card: '#111827',
-  border: '#1e293b',
-  text: '#e2e8f0',
-  textMuted: '#94a3b8',
-};
 
 export default function LeadAnalytics() {
   const [loading, setLoading] = useState(true);
@@ -31,30 +21,28 @@ export default function LeadAnalytics() {
   }, []);
 
   async function fetchLeads() {
+    setLoading(true);
     try {
-      const API_URL = import.meta.env.VITE_SUPABASE_URL || 'https://gxwurcysysqbulbbazph.supabase.co';
-      const API_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const API_URL = 'https://gxwurcysysqbulbbazph.supabase.co';
+      const API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4d3VyY3lzeXNxYnVsYmJhenBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMjczMDYsImV4cCI6MjA4OTYwMzMwNn0.RlB52DP8mf5H0WjHkd0K_fJ1dLVQ0Z2Rr7ZVJ1qO1Z0';
       
-      const res = await fetch(`${API_URL}/rest/v1/leads?select=*&order(created_at,desc)&limit=500`, {
+      const res = await fetch(`${API_URL}/rest/v1/leads?select=*&order(created_at,desc)&limit=200`, {
         headers: {
           'apikey': API_KEY,
           'Authorization': `Bearer ${API_KEY}`
         }
       });
-      const data = await res.json();
+      const data = res.ok ? await res.json() : [];
       
-      // Calculate stats
       const withEmail = data?.filter(l => l.email)?.length || 0;
       const withPhone = data?.filter(l => l.phone)?.length || 0;
       
-      // Count by source
       const sources = {};
       data?.forEach(lead => {
         const source = lead.source || 'unknown';
         sources[source] = (sources[source] || 0) + 1;
       });
       
-      // Count by category
       const categories = {};
       data?.forEach(lead => {
         const cat = lead.category || 'uncategorized';
@@ -81,20 +69,20 @@ export default function LeadAnalytics() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#1a2fa8] border-t-transparent"></div>
+        <div className="w-8 h-8 border-4 border-[#1a2fa8] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-6 bg-[#0a1628] min-h-screen">
-      <div className="flex justify-between items-center">
+    <div className="p-4 md:p-8 space-y-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Lead Analytics</h1>
           <p className="text-[#94a3b8]">Your scraped leads from multiple sources</p>
         </div>
-        <button onClick={fetchLeads} className="p-2 bg-[#111827] text-[#e2e8f0] rounded-lg border border-[#1e293b] hover:border-[#00c896]">
-          ↻
+        <button onClick={fetchLeads} className="btn-secondary flex items-center gap-2 self-start">
+          ↻ Refresh
         </button>
       </div>
 
@@ -103,13 +91,13 @@ export default function LeadAnalytics() {
         <MetricCard label="Total Leads" value={stats.total} color="#1a2fa8" />
         <MetricCard label="With Email" value={stats.withEmail} color="#00c896" />
         <MetricCard label="With Phone" value={stats.withPhone} color="#6366f1" />
-        <MetricCard label="No Contact" value={stats.total - stats.withEmail} color="#94a3b8" />
+        <MetricCard label="No Contact" value={stats.total - stats.withEmail - stats.withPhone} color="#94a3b8" />
       </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Source Breakdown */}
-        <div className="bg-[#111827] rounded-xl p-6 border border-[#1e293b]">
+        <div className="card">
           <h3 className="text-lg font-semibold text-white mb-4">Leads by Source</h3>
           <div className="space-y-3">
             {Object.entries(stats.sources).map(([source, count], idx) => (
@@ -128,7 +116,7 @@ export default function LeadAnalytics() {
         </div>
 
         {/* Category Breakdown */}
-        <div className="bg-[#111827] rounded-xl p-6 border border-[#1e293b]">
+        <div className="card">
           <h3 className="text-lg font-semibold text-white mb-4">Leads by Category</h3>
           <div className="space-y-3">
             {Object.entries(stats.categories).map(([cat, count], idx) => (
@@ -148,27 +136,25 @@ export default function LeadAnalytics() {
       </div>
 
       {/* Recent Leads Table */}
-      <div className="bg-[#111827] rounded-xl p-6 border border-[#1e293b]">
-        <h3 className="text-lg font-semibold text-white mb-4">Recent Leads</h3>
+      <div className="card">
+        <h3 className="text-lg font-semibold text-white mb-4">Recent Leads ({leads.length})</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#1e293b]">
-                <th className="text-left py-3 px-4 text-[#94a3b8] font-medium">Business</th>
-                <th className="text-left py-3 px-4 text-[#94a3b8] font-medium">Source</th>
-                <th className="text-left py-3 px-4 text-[#94a3b8] font-medium">Email</th>
-                <th className="text-left py-3 px-4 text-[#94a3b8] font-medium">Phone</th>
-                <th className="text-left py-3 px-4 text-[#94a3b8] font-medium">Added</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-[#94a3b8] uppercase">Business</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-[#94a3b8] uppercase">Source</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-[#94a3b8] uppercase">Email</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-[#94a3b8] uppercase">Phone</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-[#94a3b8] uppercase">Added</th>
               </tr>
             </thead>
             <tbody>
               {leads.slice(0, 20).map((lead, idx) => (
-                <tr key={idx} className="border-b border-[#1e293b]/50 hover:bg-[#0a1628]">
-                  <td className="py-3 px-4 text-white font-medium">{lead.business_name}</td>
+                <tr key={idx} className="border-b border-[#1e293b]/50 hover:bg-[#0a1628]/50">
+                  <td className="py-3 px-4 text-white font-medium">{lead.business_name || 'N/A'}</td>
                   <td className="py-3 px-4">
-                    <span className="px-2 py-1 rounded-full text-xs bg-[#1a2fa8]/20 text-[#1a2fa8]">
-                      {lead.source || 'unknown'}
-                    </span>
+                    <span className="badge badge-primary">{lead.source || 'unknown'}</span>
                   </td>
                   <td className="py-3 px-4 text-[#94a3b8]">{lead.email || '-'}</td>
                   <td className="py-3 px-4 text-[#94a3b8]">{lead.phone || '-'}</td>
@@ -194,13 +180,11 @@ export default function LeadAnalytics() {
 
 function MetricCard({ label, value, color }) {
   return (
-    <div className="bg-[#111827] rounded-xl p-4 border border-[#1e293b]">
-      <div className="flex items-center gap-2">
-        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
-        <span className="text-[#94a3b8] text-sm">{label}</span>
-      </div>
-      <div className="mt-2">
-        <span className="text-2xl font-bold text-white">{value.toLocaleString()}</span>
+    <div className="card flex items-center gap-3">
+      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
+      <div>
+        <p className="text-xl font-bold text-white">{value.toLocaleString()}</p>
+        <p className="text-[#94a3b8] text-sm">{label}</p>
       </div>
     </div>
   );
