@@ -5,7 +5,6 @@ import { Search, CheckCircle2, Circle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
-import NavBar from "@/components/NavBar";
 
 const STATUS_STYLES = {
   Sent: "bg-blue-100 text-blue-700",
@@ -43,7 +42,6 @@ export default function EmailLog() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavBar />
       <div className="max-w-screen-2xl mx-auto px-6 py-8">
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-[#1a2fa8]">Email Log</h2>

@@ -6,7 +6,6 @@ import StatsRow from "@/components/leads/StatsRow";
 import LeadsCharts from "@/components/leads/LeadsCharts";
 import LeadsTable from "@/components/leads/LeadsTable";
 import LeadPanel from "@/components/leads/LeadPanel";
-import NavBar from "@/components/NavBar";
 import BulkSendModal from "@/components/leads/BulkSendModal";
 
 export default function LeadsDashboard() {
@@ -60,7 +59,6 @@ export default function LeadsDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavBar />
 
       <div className="max-w-screen-2xl mx-auto px-6 py-8 space-y-8">
         <StatsRow leads={leads} totalCount={leads.length} />

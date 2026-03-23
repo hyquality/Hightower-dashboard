@@ -5,7 +5,6 @@ import { Plus, Send, BarChart2, MousePointerClick, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import CampaignFormPanel from "@/components/campaigns/CampaignFormPanel";
-import NavBar from "@/components/NavBar";
 
 const STATUS_COLORS = {
   Draft: "bg-slate-100 text-slate-600",
@@ -37,7 +36,6 @@ export default function Campaigns() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavBar />
       <div className="max-w-screen-2xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
