@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Mail, Send, TrendingUp, Plus, ArrowRight, RefreshCw, BarChart3, DollarSign } from 'lucide-react';
+import { Users, Mail, Send, RefreshCw, BarChart3, DollarSign } from 'lucide-react';
 
 const COLORS = {
   primary: '#1a2fa8',
@@ -20,7 +20,6 @@ export default function DashboardHome() {
     emailsSent: 0,
     enrichedLeads: 0
   });
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchStats();
@@ -28,36 +27,23 @@ export default function DashboardHome() {
 
   async function fetchStats() {
     setLoading(true);
-    setError(null);
     try {
-      'https://gxwurcysysqbulbbazph.supabase.co';
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4d3VyY3lzeXNxYnVsYmJhenBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMjczMDYsImV4cCI6MjA4OTYwMzMwNn0.RlB52DP8mf5H0WjHkd0K_fJ1dLVQ0Z2Rr7ZVJ1qO1Z0';
+      const API_URL = 'https://gxwurcysysqbulbbazph.supabase.co';
+      const API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4d3VyY3lzeXNxYnVsYmJhenBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMjczMDYsImV4cCI6MjA4OTYwMzMwNn0.RlB52DP8mf5H0WjHkd0K_fJ1dLVQ0Z2Rr7ZVJ1qO1Z0';
       
-      // Fetch leads count
-      const leadsRes = await fetch(`${API_URL}/rest/v1/leads?select=id,email`, {
-        headers: {
-          'apikey': API_KEY,
-          'Authorization': `Bearer ${API_KEY}`
-        }
-      });
+      const headers = {
+        'apikey': API_KEY,
+        'Authorization': `Bearer ${API_KEY}`
+      };
+      
+      const [leadsRes, campRes, logRes] = await Promise.all([
+        fetch(`${API_URL}/rest/v1/leads?select=id,email`, { headers }),
+        fetch(`${API_URL}/rest/v1/campaigns?select=id`, { headers }),
+        fetch(`${API_URL}/rest/v1/email_logs?select=id`, { headers })
+      ]);
+      
       const leads = leadsRes.ok ? await leadsRes.json() : [];
-      
-      // Fetch campaigns count  
-      const campRes = await fetch(`${API_URL}/rest/v1/campaigns?select=id`, {
-        headers: {
-          'apikey': API_KEY,
-          'Authorization': `Bearer ${API_KEY}`
-        }
-      });
       const campaigns = campRes.ok ? await campRes.json() : [];
-      
-      // Fetch email logs
-      const logRes = await fetch(`${API_URL}/rest/v1/email_logs?select=id`, {
-        headers: {
-          'apikey': API_KEY,
-          'Authorization': `Bearer ${API_KEY}`
-        }
-      });
       const logs = logRes.ok ? await logRes.json() : [];
       
       const leadsWithEmail = leads?.filter(l => l.email)?.length || 0;
@@ -70,7 +56,6 @@ export default function DashboardHome() {
       });
     } catch (err) {
       console.error('Error fetching stats:', err);
-      setError('Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -86,87 +71,35 @@ export default function DashboardHome() {
 
   return (
     <div className="p-4 md:p-8 space-y-6">
-      {/* Welcome Header */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-white">Welcome back! 👋</h1>
           <p className="text-[#94a3b8] mt-1">Here's what's happening with your MCA business</p>
         </div>
-        <button 
-          onClick={fetchStats} 
-          className="btn-secondary flex items-center gap-2 self-start"
-        >
+        <button onClick={fetchStats} className="btn-secondary flex items-center gap-2 self-start">
           <RefreshCw className="w-4 h-4" />
           Refresh
         </button>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          icon={Users} 
-          label="Total Leads" 
-          value={stats.totalLeads} 
-          color={COLORS.primary}
-        />
-        <StatCard 
-          icon={Mail} 
-          label="Campaigns" 
-          value={stats.campaigns}
-          color={COLORS.accent}
-        />
-        <StatCard 
-          icon={Send} 
-          label="Emails Sent" 
-          value={stats.emailsSent} 
-          color="#6366f1"
-        />
-        <StatCard 
-          icon={DollarSign} 
-          label="Enriched Leads" 
-          value={stats.enrichedLeads} 
-          color={COLORS.accent}
-        />
+        <StatCard icon={Users} label="Total Leads" value={stats.totalLeads} color={COLORS.primary} />
+        <StatCard icon={Mail} label="Campaigns" value={stats.campaigns} color={COLORS.accent} />
+        <StatCard icon={Send} label="Emails Sent" value={stats.emailsSent} color="#6366f1" />
+        <StatCard icon={DollarSign} label="Enriched Leads" value={stats.enrichedLeads} color={COLORS.accent} />
       </div>
 
-      {/* Quick Actions */}
       <div className="card">
         <h2 className="text-xl font-semibold text-white mb-6">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <QuickAction 
-            icon={Plus} 
-            label="Add Leads" 
-            description="Import or add manually"
-            color={COLORS.primary}
-            to="/LeadsDashboard"
-          />
-          <QuickAction 
-            icon={Send} 
-            label="Send Campaign" 
-            description="Create & send email campaign"
-            color={COLORS.accent}
-            to="/Campaigns"
-          />
-          <QuickAction 
-            icon={BarChart3} 
-            label="Analytics" 
-            description="View lead sources"
-            color="#f59e0b"
-            to="/leads"
-          />
-          <QuickAction 
-            icon={Mail} 
-            label="Email Log" 
-            description="View sent emails"
-            color="#6366f1"
-            to="/EmailLog"
-          />
+          <QuickAction icon={Plus} label="Add Leads" description="Import or add manually" color={COLORS.primary} to="/LeadsDashboard" />
+          <QuickAction icon={Send} label="Send Campaign" description="Create & send email campaign" color={COLORS.accent} to="/Campaigns" />
+          <QuickAction icon={BarChart3} label="Analytics" description="View lead sources" color="#f59e0b" to="/leads" />
+          <QuickAction icon={Mail} label="Email Log" description="View sent emails" color="#6366f1" to="/EmailLog" />
         </div>
       </div>
 
-      {/* Info Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Lead Sources */}
         <div className="card">
           <h2 className="text-lg font-semibold text-white mb-4">Lead Breakdown</h2>
           <div className="space-y-4">
@@ -185,7 +118,6 @@ export default function DashboardHome() {
           </div>
         </div>
 
-        {/* Campaign Status */}
         <div className="card">
           <h2 className="text-lg font-semibold text-white mb-4">Campaign Status</h2>
           <div className="space-y-4">
